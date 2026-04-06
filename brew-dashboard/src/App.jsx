@@ -1,121 +1,183 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useMemo, useState } from "react";
+import "./App.css";
+
+const API_KEY = import.meta.env.VITE_SPOONACULAR_API_KEY;
+console.log("API KEY:", API_KEY);
+
+const buildUrl = (query) => {
+  const params = new URLSearchParams({
+    apiKey: API_KEY,
+    query: query || "pasta",
+    number: "25",          // show up to 24 recipes
+    addRecipeInformation: "true", // include readyInMinutes, servings, etc.
+    instructionsRequired: "true", // only recipes with instructions
+  });
+
+  return `https://api.spoonacular.com/recipes/complexSearch?${params.toString()}`;
+};
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [recipes, setRecipes] = useState([]);
+  const [totalResults, setTotalResults] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterType, setFilterType] = useState("all"); // e.g. vegetarian, vegan, gluten free
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!API_KEY) {
+      setError("Missing Spoonacular API key. Add VITE_SPOONACULAR_API_KEY to your .env file.");
+      setLoading(false);
+      return;
+    }
+
+    const fetchRecipes = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const url = buildUrl("pasta");
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch recipes");
+        }
+
+        const data = await response.json();
+
+        // Spoonacular complexSearch returns { results: [...], totalResults, ... }
+        setRecipes(data.results || []);
+        setTotalResults(data.totalResults || 0);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecipes();
+  }, []);
+
+  const filteredRecipes = useMemo(() => {
+    return recipes.filter((recipe) => {
+      const matchesSearch = recipe.title
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+
+      // Simple diet filter using recipe.diets array from addRecipeInformation=true
+      const matchesFilter =
+        filterType === "all" ||
+        (Array.isArray(recipe.diets) &&
+          recipe.diets.map((d) => d.toLowerCase()).includes(filterType));
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [recipes, searchTerm, filterType]);
+
+  const totalShown = filteredRecipes.length;
+
+  const averageReadyTime =
+    filteredRecipes.length > 0
+      ? Math.round(
+          filteredRecipes.reduce(
+            (sum, recipe) => sum + (recipe.readyInMinutes || 0),
+            0
+          ) / filteredRecipes.length
+        )
+      : 0;
+
+  const uniqueDiets = new Set(
+    filteredRecipes
+      .flatMap((recipe) => recipe.diets || [])
+      .map((diet) => diet.toLowerCase())
+  );
+
+  const dietOptions = ["all", ...Array.from(uniqueDiets)];
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="app">
+      <header className="header">
+        <h1>Recipe Explorer Dashboard</h1>
+        <p>Search quick recipes and explore by diet type.</p>
+      </header>
+
+      <section className="stats-container">
+        <div className="stat-card">
+          <h2>{totalShown}</h2>
+          <p>Visible Recipes</p>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+
+        <div className="stat-card">
+          <h2>{totalResults}</h2>
+          <p>Total API Results</p>
         </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+
+        <div className="stat-card">
+          <h2>{averageReadyTime || "–"}</h2>
+          <p>Avg. Ready Time (min)</p>
+        </div>
+      </section>
+
+      <section className="controls">
+        <input
+          type="text"
+          placeholder="Search within results by title..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
         >
-          Count is {count}
-        </button>
+          {dietOptions.map((diet) => (
+            <option key={diet} value={diet}>
+              {diet === "all"
+                ? "All Diets"
+                : diet.charAt(0).toUpperCase() + diet.slice(1)}
+            </option>
+          ))}
+        </select>
       </section>
 
-      <div className="ticks"></div>
+      {loading && <p className="message">Loading recipes...</p>}
+      {error && <p className="message error">{error}</p>}
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {!loading && !error && (
+        <section className="cards-grid">
+          {filteredRecipes.map((recipe) => (
+            <article className="recipe-card" key={recipe.id}>
+              <img
+                src={recipe.image}
+                alt={recipe.title}
+                className="recipe-image"
+                loading="lazy"
+              />
+              <div className="recipe-content">
+                <h3>{recipe.title}</h3>
+                <p className="meta">
+                  {recipe.readyInMinutes
+                    ? `${recipe.readyInMinutes} min`
+                    : "Time N/A"}{" "}
+                  ·{" "}
+                  {recipe.servings ? `${recipe.servings} servings` : "Servings N/A"}
+                </p>
+                {recipe.diets && recipe.diets.length > 0 && (
+                  <p className="diets">
+                    Diets: {recipe.diets.join(", ")}
+                  </p>
+                )}
+              </div>
+            </article>
+          ))}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+          {filteredRecipes.length === 0 && (
+            <p className="message">No recipes match your filters.</p>
+          )}
+        </section>
+      )}
+    </div>
+  );
 }
 
-export default App
+export default App;
