@@ -50,7 +50,7 @@ The following **additional** features are implemented:
 
 Here's a walkthrough:
 
-<img src="veni-vici-clean\walkthrough.gif" title="Video Walkthrough" width="" alt="Video Walkthrough" />
+<img src="walkthrough-week6.gif" title="Video Walkthrough" width="" alt="Video Walkthrough" />
 
 ## Notes
 
